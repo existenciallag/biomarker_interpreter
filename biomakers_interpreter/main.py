@@ -40,7 +40,7 @@ def read_csv(path: str) -> list[dict]:
         return list(reader)
 
 # ─── Llamada a la API de Anthropic ───────────────────────────────────────
-def call_llm(panel_result, row: dict) -> dict:
+def call_llm(panel_result, row: dict, model: str = "claude-sonnet-4-6") -> dict:
     try:
         import anthropic
     except ImportError:
@@ -107,10 +107,10 @@ def call_llm(panel_result, row: dict) -> dict:
                                ensure_ascii=False, indent=2)
 
     client = anthropic.Anthropic(api_key=api_key)
-    print(f"  → Llamando API (Sonnet)...")
+    print(f"  → Llamando API ({model})...")
 
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=model,
         max_tokens=4096,
         system=load_system_prompt(),
         messages=[{"role": "user", "content": user_content}]
@@ -138,7 +138,8 @@ def output_filename(patient_id: str, modo: str, output_dir: str) -> str:
     return str(Path(output_dir) / fname)
 
 # ─── Pipeline principal ───────────────────────────────────────────────────
-def run_pipeline(csv_path: str, mode: str, patient_filter: str, output_dir: str):
+def run_pipeline(csv_path: str, mode: str, patient_filter: str, output_dir: str,
+                 model: str = "claude-sonnet-4-6"):
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     rows = read_csv(csv_path)
@@ -167,7 +168,7 @@ def run_pipeline(csv_path: str, mode: str, patient_filter: str, output_dir: str)
         # 2. LLM si se requiere
         llm_result = None
         if mode == "llm":
-            llm_result = call_llm(panel_result, row)
+            llm_result = call_llm(panel_result, row, model=model)
             print(f"  LLM: OK")
 
         # 3. Generar PDF
@@ -202,6 +203,8 @@ Ejemplos:
                         help="ID de paciente específico (opcional; si no se indica, procesa todos)")
     parser.add_argument("--output",  default="./informes",
                         help="Directorio de salida para los PDFs (default: ./informes)")
+    parser.add_argument("--model",   default="claude-sonnet-4-6",
+                        help="Modelo Claude para modo llm (default: claude-sonnet-4-6)")
 
     args = parser.parse_args()
 
@@ -217,7 +220,7 @@ Ejemplos:
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
 
-    run_pipeline(args.input, args.mode, args.patient, args.output)
+    run_pipeline(args.input, args.mode, args.patient, args.output, args.model)
 
 if __name__ == "__main__":
     main()
